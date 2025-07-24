@@ -1,12 +1,37 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Database, Shield, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+
+// Simple tooltip component that definitely works
+const SimpleTooltip = ({
+  children,
+  content,
+}: {
+  children: React.ReactNode;
+  content: string;
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+      >
+        {children}
+      </div>
+      {isVisible && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-[9999] w-80">
+          <div className="bg-gray-900 text-white text-sm rounded py-2 px-3 shadow-lg leading-relaxed">
+            {content}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export interface LockAnalysis {
   table: string;
@@ -83,97 +108,83 @@ export const LockAnalysisResults = ({
   };
 
   return (
-    <TooltipProvider>
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Shield className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold text-foreground">
-            Lock Analysis Results
-          </h2>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Shield className="h-6 w-6 text-primary" />
+        <h2 className="text-2xl font-bold text-foreground">
+          Lock Analysis Results
+        </h2>
+      </div>
 
-        {queryType && (
-          <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <Database className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium">Query Type:</span>
-                <Badge variant="default" className="bg-primary">
-                  {queryType}
-                </Badge>
+      {queryType && (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">Query Type:</span>
+              <Badge variant="default" className="bg-primary">
+                {queryType}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4">
+        {results.map((result, index) => (
+          <Card key={index} className="shadow-elegant">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Database className="h-5 w-5 text-database-blue" />
+                  Table:{" "}
+                  <code className="font-mono text-primary">{result.table}</code>
+                </CardTitle>
+                <SimpleTooltip content={result.description}>
+                  <Badge
+                    variant={getLockBadgeVariant(result.lockMode)}
+                    className="font-mono text-xs cursor-help"
+                  >
+                    {result.lockMode}
+                  </Badge>
+                </SimpleTooltip>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-2">
+                  Description
+                </h4>
+                <p className="text-sm">{result.description}</p>
+              </div>
+
+              {result.conflicts.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-warning" />
+                    Conflicts With
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {result.conflicts.map((conflict, i) => (
+                      <SimpleTooltip
+                        key={i}
+                        content={getLockDescription(conflict)}
+                      >
+                        <Badge
+                          variant="outline"
+                          className="text-xs cursor-help"
+                        >
+                          {conflict}
+                        </Badge>
+                      </SimpleTooltip>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
-
-        <div className="grid gap-4">
-          {results.map((result, index) => (
-            <Card key={index} className="shadow-elegant">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Database className="h-5 w-5 text-database-blue" />
-                    Table:{" "}
-                    <code className="font-mono text-primary">
-                      {result.table}
-                    </code>
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge
-                        variant={getLockBadgeVariant(result.lockMode)}
-                        className="font-mono text-xs cursor-help"
-                      >
-                        {result.lockMode}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="max-w-xs">{result.description}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground mb-2">
-                    Description
-                  </h4>
-                  <p className="text-sm">{result.description}</p>
-                </div>
-
-                {result.conflicts.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-warning" />
-                      Conflicts With
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {result.conflicts.map((conflict, i) => (
-                        <Tooltip key={i}>
-                          <TooltipTrigger asChild>
-                            <Badge
-                              variant="outline"
-                              className="text-xs cursor-help"
-                            >
-                              {conflict}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">
-                              {getLockDescription(conflict)}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        ))}
       </div>
-    </TooltipProvider>
+    </div>
   );
 };
-

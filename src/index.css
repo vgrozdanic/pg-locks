@@ -17,9 +17,9 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 210 20% 10%;
 
-    --primary: 195 100% 39%;
+    --primary: 207 48% 38%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 195 100% 50%;
+    --primary-glow: 207 48% 45%;
 
     --secondary: 210 15% 92%;
     --secondary-foreground: 210 20% 10%;
@@ -27,7 +27,7 @@ All colors MUST be HSL.
     --muted: 210 15% 95%;
     --muted-foreground: 210 10% 45%;
 
-    --accent: 180 100% 35%;
+    --accent: 207 48% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 85% 60%;
@@ -41,18 +41,18 @@ All colors MUST be HSL.
 
     --border: 210 15% 88%;
     --input: 210 15% 88%;
-    --ring: 195 100% 39%;
+    --ring: 207 48% 38%;
 
-    --database-blue: 195 100% 39%;
-    --database-teal: 180 100% 35%;
+    --database-blue: 207 48% 38%;
+    --database-teal: 207 48% 45%;
     --sql-bg: 210 20% 7%;
     --sql-border: 210 15% 15%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(195 100% 39%), hsl(180 100% 35%));
+    --gradient-primary: linear-gradient(135deg, hsl(207 48% 38%), hsl(207 48% 45%));
     --gradient-subtle: linear-gradient(180deg, hsl(210 20% 98%), hsl(210 15% 95%));
 
-    --shadow-elegant: 0 8px 32px -8px hsl(195 100% 39% / 0.2);
-    --shadow-glow: 0 0 40px hsl(195 100% 50% / 0.3);
+    --shadow-elegant: 0 8px 32px -8px hsl(207 48% 38% / 0.2);
+    --shadow-glow: 0 0 40px hsl(207 48% 45% / 0.3);
 
     --radius: 0.75rem;
 

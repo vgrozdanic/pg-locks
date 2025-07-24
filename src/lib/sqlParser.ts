@@ -14,42 +14,42 @@ export interface LockInfo {
 const LOCK_MODES: Record<string, LockInfo> = {
   'ACCESS SHARE': {
     lockMode: 'ACCESS SHARE',
-    description: 'Table-level lock. Acquired by SELECT statements and other read-only operations. Only conflicts with ACCESS EXCLUSIVE lock.',
+    description: 'Conflicts with ACCESS EXCLUSIVE lock mode only. Can be held by multiple transactions simultaneously. Acquired by SELECT and other read-only operations. Held until end of transaction. This is the least restrictive table-level lock.',
     conflicts: ['ACCESS EXCLUSIVE']
   },
   'ROW SHARE': {
     lockMode: 'ROW SHARE',
-    description: 'Table-level lock. Acquired by SELECT FOR UPDATE/SHARE/etc. Conflicts with EXCLUSIVE and ACCESS EXCLUSIVE locks.',
+    description: 'Conflicts with EXCLUSIVE and ACCESS EXCLUSIVE lock modes. Acquired by SELECT with FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE, or FOR KEY SHARE options. Also acquires row-level locks on selected rows, preventing them from being modified or deleted by other transactions until the current transaction ends. Held until end of transaction.',
     conflicts: ['EXCLUSIVE', 'ACCESS EXCLUSIVE']
   },
   'ROW EXCLUSIVE': {
     lockMode: 'ROW EXCLUSIVE',
-    description: 'Table-level lock. Acquired by UPDATE, DELETE, INSERT, and MERGE statements. Conflicts with SHARE and stronger locks.',
+    description: 'Conflicts with SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Acquired by UPDATE, DELETE, INSERT, and MERGE commands on the target table (other referenced tables get ACCESS SHARE locks). Held until end of transaction.',
     conflicts: ['SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
   },
   'SHARE UPDATE EXCLUSIVE': {
     lockMode: 'SHARE UPDATE EXCLUSIVE',
-    description: 'Table-level lock. Protects against concurrent schema changes and VACUUM runs. Acquired by VACUUM (without FULL), ANALYZE, CREATE INDEX CONCURRENTLY.',
+    description: 'Conflicts with SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Self-conflicting - only one transaction can hold this lock at a time. Protects against concurrent schema changes and VACUUM runs. Acquired by VACUUM (without FULL), ANALYZE, CREATE INDEX CONCURRENTLY, CREATE STATISTICS, COMMENT ON, REINDEX CONCURRENTLY, and certain ALTER INDEX and ALTER TABLE variants. Held until end of transaction.',
     conflicts: ['SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
   },
   'SHARE': {
     lockMode: 'SHARE',
-    description: 'Table-level lock. Protects against concurrent data changes. Acquired by CREATE INDEX (without CONCURRENTLY).',
+    description: 'Conflicts with ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Protects a table against concurrent data changes - blocks all data modifications while allowing concurrent reads. Acquired by CREATE INDEX (without CONCURRENTLY). Held until end of transaction.',
     conflicts: ['ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
   },
   'SHARE ROW EXCLUSIVE': {
     lockMode: 'SHARE ROW EXCLUSIVE',
-    description: 'Table-level lock. Protects against concurrent data changes and is self-exclusive. Acquired by CREATE TRIGGER and some ALTER TABLE forms.',
+    description: 'Conflicts with ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Self-exclusive - only one session can hold this lock at a time. Protects against concurrent data changes. Acquired by CREATE TRIGGER and some forms of ALTER TABLE. Held until end of transaction.',
     conflicts: ['ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
   },
   'EXCLUSIVE': {
     lockMode: 'EXCLUSIVE',
-    description: 'Table-level lock. Allows only concurrent ACCESS SHARE locks (reads only). Acquired by REFRESH MATERIALIZED VIEW CONCURRENTLY.',
+    description: 'Conflicts with ROW SHARE, ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Allows only concurrent ACCESS SHARE locks - only reads from the table can proceed in parallel. Acquired by REFRESH MATERIALIZED VIEW CONCURRENTLY. Held until end of transaction.',
     conflicts: ['ROW SHARE', 'ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
   },
   'ACCESS EXCLUSIVE': {
     lockMode: 'ACCESS EXCLUSIVE',
-    description: 'Table-level lock. Guarantees holder is the only transaction accessing the table. Acquired by DROP TABLE, TRUNCATE, REINDEX, VACUUM FULL.',
+    description: 'Conflicts with locks of all modes - most restrictive lock. Guarantees that the holder is the only transaction accessing the table in any way. Only ACCESS EXCLUSIVE blocks simple SELECT statements. Acquired by DROP TABLE, TRUNCATE, REINDEX, CLUSTER, VACUUM FULL, REFRESH MATERIALIZED VIEW (without CONCURRENTLY), many forms of ALTER INDEX and ALTER TABLE. Default for LOCK TABLE statements. Held until end of transaction.',
     conflicts: ['ACCESS SHARE', 'ROW SHARE', 'ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
   }
 };
@@ -97,15 +97,15 @@ async function initParser(): Promise<PgParser> {
     parserInitialized = true;
     try {
       parser = new PgParser(); // Defaults to PostgreSQL version 17
-      
+
       // Test the parser with a simple query to ensure WASM is loaded
       const testResult = await parser.parse('SELECT 1;');
-      
+
       // Check if the result indicates an error
       if (testResult && typeof testResult === 'object' && 'error' in testResult && testResult.error) {
         throw new Error(`Parser test failed: ${testResult.error}`);
       }
-      
+
       // Check if we got a valid tree result
       if (!testResult || typeof testResult !== 'object' || !('tree' in testResult) || !testResult.tree) {
         throw new Error('Parser test failed: No valid AST tree returned');
@@ -116,11 +116,11 @@ async function initParser(): Promise<PgParser> {
       throw error;
     }
   }
-  
+
   if (!parser) {
     throw new Error('Parser not initialized');
   }
-  
+
   return parser;
 }
 
@@ -133,18 +133,18 @@ export async function parseSQL(query: string): Promise<ParsedQuery> {
 
     // Get parser instance (now async)
     const parserInstance = await initParser();
-    
+
     // Ensure query ends with semicolon (required by pg parsers)
     const queryWithSemicolon = cleanQuery.endsWith(';') ? cleanQuery : cleanQuery + ';';
-    
+
     // Parse SQL to AST using @supabase/pg-parser
     const result = await parserInstance.parse(queryWithSemicolon);
-    
+
     // Check if parsing failed
     if (result && typeof result === 'object' && 'error' in result && result.error) {
       return { command: '', tables: [], isValid: false, error: result.error };
     }
-    
+
     // Extract the AST tree
     let ast;
     if (result && typeof result === 'object' && 'tree' in result) {
@@ -153,28 +153,28 @@ export async function parseSQL(query: string): Promise<ParsedQuery> {
       // Maybe the result IS the tree directly?
       ast = result;
     }
-    
+
     if (!ast || !ast.stmts || ast.stmts.length === 0) {
       return { command: '', tables: [], isValid: false, error: 'No statements found in query' };
     }
 
     // Process the first statement (support for single statements for now)
     const statement = ast.stmts[0].stmt;
-    
+
     // Extract command and tables from AST
     const extractionResult = extractFromAST(statement);
-    
+
     return {
       command: extractionResult.command,
       tables: extractionResult.tables,
       isValid: true
     };
   } catch (error) {
-    return { 
-      command: '', 
-      tables: [], 
-      isValid: false, 
-      error: `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    return {
+      command: '',
+      tables: [],
+      isValid: false,
+      error: `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
@@ -248,7 +248,7 @@ function extractFromAST(statement: any): ASTExtractionResult {
     command = 'CREATE TRIGGER';
     extractTableFromRelation(statement.CreateTrigStmt.relation, tables);
   } else if (statement.RefreshMatViewStmt) {
-    command = statement.RefreshMatViewStmt.concurrent ? 
+    command = statement.RefreshMatViewStmt.concurrent ?
       'REFRESH MATERIALIZED VIEW CONCURRENTLY' : 'REFRESH MATERIALIZED VIEW';
     extractTableFromRelation(statement.RefreshMatViewStmt.relation, tables);
   } else if (statement.DropStmt) {
@@ -265,7 +265,7 @@ function extractFromAST(statement: any): ASTExtractionResult {
     command = analyzeAlterTableStatement(statement.AlterTableStmt, tables);
   } else if (statement.VacuumStmt) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    command = statement.VacuumStmt.options?.some((opt: any) => opt.DefElem?.defname === 'full') 
+    command = statement.VacuumStmt.options?.some((opt: any) => opt.DefElem?.defname === 'full')
       ? 'VACUUM FULL' : 'VACUUM';
     if (statement.VacuumStmt.rels && statement.VacuumStmt.rels.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -295,10 +295,10 @@ function extractFromAST(statement: any): ASTExtractionResult {
   }
 
   // Filter out CTE names from the final table list
-  const filteredTables = Array.from(tables).filter(table => 
+  const filteredTables = Array.from(tables).filter(table =>
     table.length > 0 && !cteNames.has(table)
   );
-  
+
   return {
     command,
     tables: filteredTables
@@ -308,7 +308,7 @@ function extractFromAST(statement: any): ASTExtractionResult {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function analyzeSelectStatement(selectStmt: any, tables: Set<string>, cteNames: Set<string> = new Set()): string {
   let command = 'SELECT';
-  
+
   // Check for locking clauses (FOR UPDATE, FOR SHARE, etc.)
   if (selectStmt.lockingClause && selectStmt.lockingClause.length > 0) {
     const lockClause = selectStmt.lockingClause[0].LockingClause;
@@ -329,7 +329,7 @@ function analyzeSelectStatement(selectStmt: any, tables: Set<string>, cteNames: 
       }
     }
   }
-  
+
   // Extract tables from FROM clause
   if (selectStmt.fromClause) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -337,12 +337,12 @@ function analyzeSelectStatement(selectStmt: any, tables: Set<string>, cteNames: 
       extractTablesFromFromClause(fromItem, tables);
     });
   }
-  
+
   // Extract tables from WHERE clause subqueries
   if (selectStmt.whereClause) {
     extractTablesFromExpression(selectStmt.whereClause, tables, cteNames);
   }
-  
+
   // Extract tables from target list (SELECT clause) subqueries
   if (selectStmt.targetList) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -352,7 +352,7 @@ function analyzeSelectStatement(selectStmt: any, tables: Set<string>, cteNames: 
       }
     });
   }
-  
+
   return command;
 }
 
@@ -470,28 +470,28 @@ function extractTablesFromCTE(withClause: any, tables: Set<string>, cteNames: Se
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function analyzeInsertStatement(insertStmt: any, tables: Set<string>, cteNames: Set<string> = new Set()): string {
   let command = 'INSERT';
-  
+
   extractTableFromRelation(insertStmt.relation, tables);
-  
+
   // Extract tables from SELECT part (INSERT ... SELECT)
   if (insertStmt.selectStmt) {
     extractTablesFromSubquery(insertStmt.selectStmt, tables, cteNames);
   }
-  
+
   // Check for ON CONFLICT clause
   if (insertStmt.onConflictClause) {
     command = 'INSERT ON CONFLICT';
   }
-  
+
   return command;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function analyzeAlterTableStatement(alterStmt: any, tables: Set<string>): string {
   let command = 'ALTER TABLE';
-  
+
   extractTableFromRelation(alterStmt.relation, tables);
-  
+
   // Analyze specific ALTER TABLE commands
   if (alterStmt.cmds && alterStmt.cmds.length > 0) {
     const cmd = alterStmt.cmds[0].AlterTableCmd;
@@ -529,14 +529,14 @@ function analyzeAlterTableStatement(alterStmt: any, tables: Set<string>): string
       }
     }
   }
-  
+
   return command;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractTablesFromExpression(expr: any, tables: Set<string>, cteNames: Set<string> = new Set()) {
   if (!expr) return;
-  
+
   if (expr.SubLink) {
     // Subquery in expression
     if (expr.SubLink.subselect) {
@@ -647,7 +647,7 @@ export function getLockAnalysis(command: string): LockInfo | null {
   if (!lockMode) {
     return null;
   }
-  
+
   return LOCK_MODES[lockMode];
 }
 
@@ -661,10 +661,10 @@ export interface TableLockInfo {
 // Get lock analysis for each table based on its role in the query
 export function getTableLockAnalysis(tables: string[], command: string, primaryTable?: string): TableLockInfo[] {
   const results: TableLockInfo[] = [];
-  
+
   for (const table of tables) {
     let lockMode: string;
-    
+
     // Special handling for specific commands where multiple tables get the same lock
     if (command === 'ALTER TABLE ADD FOREIGN KEY' && tables.length === 2) {
       // For FK creation: primary table gets SHARE ROW EXCLUSIVE, referenced table gets SHARE ROW EXCLUSIVE too
@@ -685,7 +685,7 @@ export function getTableLockAnalysis(tables: string[], command: string, primaryT
       // Referenced tables (in FROM, JOIN, subqueries) typically get ACCESS SHARE
       lockMode = 'ACCESS SHARE';
     }
-    
+
     const lockInfo = LOCK_MODES[lockMode];
     if (lockInfo) {
       results.push({
@@ -696,7 +696,7 @@ export function getTableLockAnalysis(tables: string[], command: string, primaryT
       });
     }
   }
-  
+
   return results;
 }
 
@@ -705,12 +705,12 @@ function isPrimaryTable(table: string, command: string, primaryTable: string | u
   if (primaryTable) {
     return table === primaryTable;
   }
-  
+
   // For multi-table operations, all tables may be primary
   if (['TRUNCATE'].includes(command)) {
     return true;
   }
-  
+
   // For single table operations, the first table is usually primary
   // This is a heuristic and may need refinement based on AST analysis
   return table === allTables[0];
@@ -721,7 +721,7 @@ export function parseSQLSync(query: string): ParsedQuery {
   // This is a fallback that uses the old regex-based approach
   // It's kept for compatibility but should be replaced with parseSQL
   console.warn('parseSQLSync is deprecated. Use parseSQL instead.');
-  
+
   try {
     const cleanQuery = query.trim();
     if (!cleanQuery) {
@@ -731,18 +731,18 @@ export function parseSQLSync(query: string): ParsedQuery {
     // Simple fallback extraction
     const commandMatch = cleanQuery.match(/^(\w+)/i);
     const command = commandMatch ? commandMatch[1].toUpperCase() : 'UNKNOWN';
-    
+
     return {
       command,
       tables: [],
       isValid: true
     };
   } catch (error) {
-    return { 
-      command: '', 
-      tables: [], 
-      isValid: false, 
-      error: `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    return {
+      command: '',
+      tables: [],
+      isValid: false,
+      error: `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }

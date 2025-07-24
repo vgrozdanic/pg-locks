@@ -13,7 +13,7 @@ import {
   getTableLockAnalysis,
 } from "@/lib/sqlParser";
 import { getQueryFromUrl, updateUrlWithQuery } from "@/lib/urlUtils";
-import { Database, Lock, Zap } from "lucide-react";
+import { Lock, Zap } from "lucide-react";
 
 const Index = () => {
   const [query, setQuery] = useState("");
@@ -118,9 +118,11 @@ const Index = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-center items-center gap-3 mb-4">
-            <div className="p-3 rounded-xl bg-gradient-to-r from-primary to-accent text-white shadow-glow">
-              <Database className="h-8 w-8" />
-            </div>
+            <img
+              src="/android-chrome-512x512.png"
+              alt="PostgreSQL Lock Analyzer Logo"
+              className="h-12 w-12 object-contain"
+            />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               PostgreSQL Lock Analyzer
             </h1>
@@ -152,7 +154,7 @@ const Index = () => {
                 <Button
                   onClick={analyzeQuery}
                   disabled={!query.trim() || isAnalyzing}
-                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow transition-all duration-300"
+                  className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow hover:scale-[1.02] hover:brightness-110 transition-all duration-300"
                   size="lg"
                 >
                   <Lock className="h-4 w-4 mr-2" />
@@ -182,12 +184,12 @@ const Index = () => {
                   <Button
                     key={index}
                     variant="outline"
-                    className="w-full justify-start text-left h-auto p-3"
+                    className="w-full justify-start text-left h-auto p-3 group"
                     onClick={() => handleExampleQuery(example.query)}
                   >
                     <div className="w-full">
                       <div className="font-medium text-sm">{example.label}</div>
-                      <div className="text-xs text-muted-foreground mt-1 break-words whitespace-normal">
+                      <div className="text-xs text-muted-foreground group-hover:text-accent-foreground mt-1 break-words whitespace-normal">
                         {example.query.length > 60
                           ? example.query.substring(0, 60) + "..."
                           : example.query}

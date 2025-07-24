@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Database, Shield, AlertTriangle } from "lucide-react";
+import { FileQuestion, Database, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 
 // Simple tooltip component that definitely works
@@ -64,23 +64,23 @@ export const LockAnalysisResults = ({
     // Fallback descriptions for conflict locks that might not be in results
     switch (lockMode) {
       case "ACCESS SHARE":
-        return "Table-level lock. Acquired by SELECT statements and other read-only operations. Only conflicts with ACCESS EXCLUSIVE lock.";
+        return "Conflicts with ACCESS EXCLUSIVE lock mode only. Can be held by multiple transactions simultaneously. Acquired by SELECT and other read-only operations. Held until end of transaction. This is the least restrictive table-level lock.";
       case "ROW SHARE":
-        return "Table-level lock. Acquired by SELECT FOR UPDATE/SHARE/etc. Conflicts with EXCLUSIVE and ACCESS EXCLUSIVE locks.";
+        return "Conflicts with EXCLUSIVE and ACCESS EXCLUSIVE lock modes. Acquired by SELECT with FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE, or FOR KEY SHARE options. Also acquires row-level locks on selected rows, preventing them from being modified or deleted by other transactions until the current transaction ends. Held until end of transaction.";
       case "ROW EXCLUSIVE":
-        return "Table-level lock. Acquired by UPDATE, DELETE, INSERT, and MERGE statements. Conflicts with SHARE and stronger locks.";
+        return "Conflicts with SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Acquired by UPDATE, DELETE, INSERT, and MERGE commands on the target table (other referenced tables get ACCESS SHARE locks). Held until end of transaction.";
       case "SHARE UPDATE EXCLUSIVE":
-        return "Table-level lock. Protects against concurrent schema changes and VACUUM runs. Acquired by VACUUM (without FULL), ANALYZE, CREATE INDEX CONCURRENTLY.";
+        return "Conflicts with SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Self-conflicting - only one transaction can hold this lock at a time. Protects against concurrent schema changes and VACUUM runs. Acquired by VACUUM (without FULL), ANALYZE, CREATE INDEX CONCURRENTLY, CREATE STATISTICS, COMMENT ON, REINDEX CONCURRENTLY, and certain ALTER INDEX and ALTER TABLE variants. Held until end of transaction.";
       case "SHARE":
-        return "Table-level lock. Protects against concurrent data changes. Acquired by CREATE INDEX (without CONCURRENTLY).";
+        return "Conflicts with ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Protects a table against concurrent data changes - blocks all data modifications while allowing concurrent reads. Acquired by CREATE INDEX (without CONCURRENTLY). Held until end of transaction.";
       case "SHARE ROW EXCLUSIVE":
-        return "Table-level lock. Protects against concurrent data changes and is self-exclusive. Acquired by CREATE TRIGGER and some ALTER TABLE forms.";
+        return "Conflicts with ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Self-exclusive - only one session can hold this lock at a time. Protects against concurrent data changes. Acquired by CREATE TRIGGER and some forms of ALTER TABLE. Held until end of transaction.";
       case "EXCLUSIVE":
-        return "Table-level lock. Allows only concurrent ACCESS SHARE locks (reads only). Acquired by REFRESH MATERIALIZED VIEW CONCURRENTLY.";
+        return "Conflicts with ROW SHARE, ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Allows only concurrent ACCESS SHARE locks - only reads from the table can proceed in parallel. Acquired by REFRESH MATERIALIZED VIEW CONCURRENTLY. Held until end of transaction.";
       case "ACCESS EXCLUSIVE":
-        return "Table-level lock. Guarantees holder is the only transaction accessing the table. Acquired by DROP TABLE, TRUNCATE, REINDEX, VACUUM FULL.";
+        return "Conflicts with locks of all modes - most restrictive lock. Guarantees that the holder is the only transaction accessing the table in any way. Only ACCESS EXCLUSIVE blocks simple SELECT statements. Acquired by DROP TABLE, TRUNCATE, REINDEX, CLUSTER, VACUUM FULL, REFRESH MATERIALIZED VIEW (without CONCURRENTLY), many forms of ALTER INDEX and ALTER TABLE. Default for LOCK TABLE statements. Held until end of transaction.";
       default:
-        return "PostgreSQL table-level lock mode.";
+        return "PostgreSQL table-level lock mode. Held until end of transaction.";
     }
   };
 
@@ -109,18 +109,15 @@ export const LockAnalysisResults = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-bold text-foreground">
-          Lock Analysis Results
-        </h2>
-      </div>
+      <h2 className="text-2xl font-bold text-foreground">
+        Lock Analysis Results
+      </h2>
 
       {queryType && (
         <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-primary" />
+              <FileQuestion className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">Query Type:</span>
               <Badge variant="default" className="bg-primary">
                 {queryType}

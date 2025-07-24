@@ -39,6 +39,23 @@ const Index = () => {
     updateUrlWithQuery(query);
   }, [query]);
 
+  // Keyboard shortcut listener for Ctrl+Enter / Cmd+Enter
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        if (query.trim() && !isAnalyzing) {
+          analyzeQueryWithValue(query);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [query, isAnalyzing]);
+
   const analyzeQueryWithValue = async (queryToAnalyze: string) => {
     setIsAnalyzing(true);
     setError("");

@@ -1,10 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SQLQueryInput } from "@/components/SQLQueryInput";
-import { LockAnalysisResults, LockAnalysis } from "@/components/LockAnalysisResults";
+import {
+  LockAnalysisResults,
+  LockAnalysis,
+} from "@/components/LockAnalysisResults";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { parseSQL, getLockAnalysis, getTableLockAnalysis } from "@/lib/sqlParser";
+import {
+  parseSQL,
+  getLockAnalysis,
+  getTableLockAnalysis,
+} from "@/lib/sqlParser";
+import { getQueryFromUrl, updateUrlWithQuery } from "@/lib/urlUtils";
 import { Database, Lock, Zap } from "lucide-react";
 
 const Index = () => {
@@ -14,17 +22,34 @@ const Index = () => {
   const [queryType, setQueryType] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const analyzeQuery = async () => {
+  // Load query from URL on component mount
+  useEffect(() => {
+    const urlQuery = getQueryFromUrl();
+    if (urlQuery) {
+      setQuery(urlQuery);
+      // Auto-analyze if query exists in URL
+      setTimeout(() => {
+        analyzeQueryWithValue(urlQuery);
+      }, 100);
+    }
+  }, []);
+
+  // Update URL when query changes (but skip initial load and empty queries)
+  useEffect(() => {
+    updateUrlWithQuery(query);
+  }, [query]);
+
+  const analyzeQueryWithValue = async (queryToAnalyze: string) => {
     setIsAnalyzing(true);
     setError("");
     setResults([]);
-    
+
     try {
       // Small delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      const parsed = await parseSQL(query);
-      
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const parsed = await parseSQL(queryToAnalyze);
+
       if (!parsed.isValid) {
         setError(parsed.error || "Failed to parse SQL query");
         setIsAnalyzing(false);
@@ -38,8 +63,11 @@ const Index = () => {
       }
 
       // Use the new getTableLockAnalysis function for individual table lock modes
-      const analysisResults: LockAnalysis[] = getTableLockAnalysis(parsed.tables, parsed.command);
-      
+      const analysisResults: LockAnalysis[] = getTableLockAnalysis(
+        parsed.tables,
+        parsed.command
+      );
+
       if (analysisResults.length === 0) {
         setError(`Lock analysis not available for command: ${parsed.command}`);
         setIsAnalyzing(false);
@@ -50,9 +78,17 @@ const Index = () => {
       setQueryType(parsed.command);
       setIsAnalyzing(false);
     } catch (error) {
-      setError(`Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(
+        `Analysis failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
       setIsAnalyzing(false);
     }
+  };
+
+  const analyzeQuery = async () => {
+    await analyzeQueryWithValue(query);
   };
 
   const handleExampleQuery = (exampleQuery: string) => {
@@ -62,16 +98,18 @@ const Index = () => {
   const exampleQueries = [
     {
       label: "SELECT Query",
-      query: "SELECT * FROM users;"
+      query: "SELECT * FROM users;",
     },
     {
-      label: "UPDATE Query", 
-      query: "UPDATE employees SET salary = salary * 1.10 WHERE department = 'Sales';"
+      label: "UPDATE Query",
+      query:
+        "UPDATE employees SET salary = salary * 1.10 WHERE department = 'Sales';",
     },
     {
-      label: "SELECT with JOIN", 
-      query: "SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id;"
-    }
+      label: "SELECT with JOIN",
+      query:
+        "SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id;",
+    },
   ];
 
   return (
@@ -88,8 +126,9 @@ const Index = () => {
             </h1>
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Analyze your PostgreSQL queries to understand what table-level locks will be acquired. 
-            Enter a SQL query below and get detailed lock analysis.
+            Analyze your PostgreSQL queries to understand what locks on each
+            table will be acquired. Enter an SQL query below and get detailed
+            lock analysis.
           </p>
         </div>
 
@@ -110,7 +149,7 @@ const Index = () => {
                   onChange={setQuery}
                   placeholder="Enter your PostgreSQL query here... (e.g., SELECT * FROM users WHERE active = true;)"
                 />
-                <Button 
+                <Button
                   onClick={analyzeQuery}
                   disabled={!query.trim() || isAnalyzing}
                   className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow transition-all duration-300"
@@ -149,14 +188,15 @@ const Index = () => {
                     <div className="w-full">
                       <div className="font-medium text-sm">{example.label}</div>
                       <div className="text-xs text-muted-foreground mt-1 break-words whitespace-normal">
-                        {example.query.length > 60 ? example.query.substring(0, 60) + '...' : example.query}
+                        {example.query.length > 60
+                          ? example.query.substring(0, 60) + "..."
+                          : example.query}
                       </div>
                     </div>
                   </Button>
                 ))}
               </CardContent>
             </Card>
-
           </div>
         </div>
       </div>

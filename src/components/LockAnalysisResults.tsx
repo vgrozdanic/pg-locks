@@ -1,6 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Database, Shield, AlertTriangle } from "lucide-react";
 
 export interface LockAnalysis {
@@ -15,54 +20,65 @@ interface LockAnalysisResultsProps {
   queryType?: string;
 }
 
-export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsProps) => {
+export const LockAnalysisResults = ({
+  results,
+  queryType,
+}: LockAnalysisResultsProps) => {
   if (results.length === 0) {
     return null;
   }
 
-  const getLockBadgeVariant = (lockMode: string) => {
+  // Helper function to get lock description by lock mode
+  const getLockDescription = (lockMode: string) => {
+    // Find a result with this lock mode to get its description
+    const lockResult = results.find((r) => r.lockMode === lockMode);
+    if (lockResult) {
+      return lockResult.description;
+    }
+
+    // Fallback descriptions for conflict locks that might not be in results
     switch (lockMode) {
-      case 'ACCESS SHARE':
-        return 'secondary';
-      case 'ROW SHARE':
-        return 'default';
-      case 'ROW EXCLUSIVE':
-        return 'default';
-      case 'SHARE UPDATE EXCLUSIVE':
-        return 'outline';
-      case 'SHARE':
-        return 'secondary';
-      case 'SHARE ROW EXCLUSIVE':
-        return 'destructive';
-      case 'EXCLUSIVE':
-        return 'destructive';
-      case 'ACCESS EXCLUSIVE':
-        return 'destructive';
+      case "ACCESS SHARE":
+        return "Table-level lock. Acquired by SELECT statements and other read-only operations. Only conflicts with ACCESS EXCLUSIVE lock.";
+      case "ROW SHARE":
+        return "Table-level lock. Acquired by SELECT FOR UPDATE/SHARE/etc. Conflicts with EXCLUSIVE and ACCESS EXCLUSIVE locks.";
+      case "ROW EXCLUSIVE":
+        return "Table-level lock. Acquired by UPDATE, DELETE, INSERT, and MERGE statements. Conflicts with SHARE and stronger locks.";
+      case "SHARE UPDATE EXCLUSIVE":
+        return "Table-level lock. Protects against concurrent schema changes and VACUUM runs. Acquired by VACUUM (without FULL), ANALYZE, CREATE INDEX CONCURRENTLY.";
+      case "SHARE":
+        return "Table-level lock. Protects against concurrent data changes. Acquired by CREATE INDEX (without CONCURRENTLY).";
+      case "SHARE ROW EXCLUSIVE":
+        return "Table-level lock. Protects against concurrent data changes and is self-exclusive. Acquired by CREATE TRIGGER and some ALTER TABLE forms.";
+      case "EXCLUSIVE":
+        return "Table-level lock. Allows only concurrent ACCESS SHARE locks (reads only). Acquired by REFRESH MATERIALIZED VIEW CONCURRENTLY.";
+      case "ACCESS EXCLUSIVE":
+        return "Table-level lock. Guarantees holder is the only transaction accessing the table. Acquired by DROP TABLE, TRUNCATE, REINDEX, VACUUM FULL.";
       default:
-        return 'outline';
+        return "PostgreSQL table-level lock mode.";
     }
   };
 
-  const getLockTooltip = (lockMode: string) => {
+  const getLockBadgeVariant = (lockMode: string) => {
     switch (lockMode) {
-      case 'ACCESS SHARE':
-        return 'Table-level lock. Weakest lock mode. Only blocked by ACCESS EXCLUSIVE. Allows concurrent reads.';
-      case 'ROW SHARE':
-        return 'Table-level lock. Acquired by SELECT FOR UPDATE/SHARE. Allows concurrent reads and most operations.';
-      case 'ROW EXCLUSIVE':
-        return 'Table-level lock. Acquired by data modification statements (INSERT, UPDATE, DELETE). Blocks most schema changes.';
-      case 'SHARE UPDATE EXCLUSIVE':
-        return 'Table-level lock. Prevents concurrent schema changes and VACUUM. Self-conflicting.';
-      case 'SHARE':
-        return 'Table-level lock. Prevents concurrent data changes. Allows concurrent reads.';
-      case 'SHARE ROW EXCLUSIVE':
-        return 'Table-level lock. Prevents concurrent data changes. Self-exclusive - only one session can hold it.';
-      case 'EXCLUSIVE':
-        return 'Table-level lock. Only allows concurrent reads (ACCESS SHARE). Very restrictive.';
-      case 'ACCESS EXCLUSIVE':
-        return 'Table-level lock. Strongest lock mode. Blocks all other access to the table.';
+      case "ACCESS SHARE":
+        return "secondary";
+      case "ROW SHARE":
+        return "default";
+      case "ROW EXCLUSIVE":
+        return "default";
+      case "SHARE UPDATE EXCLUSIVE":
+        return "outline";
+      case "SHARE":
+        return "secondary";
+      case "SHARE ROW EXCLUSIVE":
+        return "destructive";
+      case "EXCLUSIVE":
+        return "destructive";
+      case "ACCESS EXCLUSIVE":
+        return "destructive";
       default:
-        return 'Unknown lock mode';
+        return "outline";
     }
   };
 
@@ -71,7 +87,9 @@ export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsP
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Shield className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold text-foreground">Lock Analysis Results</h2>
+          <h2 className="text-2xl font-bold text-foreground">
+            Lock Analysis Results
+          </h2>
         </div>
 
         {queryType && (
@@ -80,7 +98,9 @@ export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsP
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-primary" />
                 <span className="text-sm font-medium">Query Type:</span>
-                <Badge variant="default" className="bg-primary">{queryType}</Badge>
+                <Badge variant="default" className="bg-primary">
+                  {queryType}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -93,11 +113,14 @@ export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsP
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Database className="h-5 w-5 text-database-blue" />
-                    Table: <code className="font-mono text-primary">{result.table}</code>
+                    Table:{" "}
+                    <code className="font-mono text-primary">
+                      {result.table}
+                    </code>
                   </CardTitle>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge 
+                      <Badge
                         variant={getLockBadgeVariant(result.lockMode)}
                         className="font-mono text-xs cursor-help"
                       >
@@ -105,17 +128,19 @@ export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsP
                       </Badge>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="max-w-xs">{getLockTooltip(result.lockMode)}</p>
+                      <p className="max-w-xs">{result.description}</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground mb-2">Description</h4>
+                  <h4 className="font-semibold text-sm text-muted-foreground mb-2">
+                    Description
+                  </h4>
                   <p className="text-sm">{result.description}</p>
                 </div>
-                
+
                 {result.conflicts.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
@@ -124,9 +149,21 @@ export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsP
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {result.conflicts.map((conflict, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {conflict}
-                        </Badge>
+                        <Tooltip key={i}>
+                          <TooltipTrigger asChild>
+                            <Badge
+                              variant="outline"
+                              className="text-xs cursor-help"
+                            >
+                              {conflict}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">
+                              {getLockDescription(conflict)}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                       ))}
                     </div>
                   </div>
@@ -135,16 +172,8 @@ export const LockAnalysisResults = ({ results, queryType }: LockAnalysisResultsP
             </Card>
           ))}
         </div>
-
-        <Card className="border-muted bg-muted/30">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              <strong>Note:</strong> Row-level locks may also be acquired on specific rows being modified. 
-              The analysis above shows table-level locks only.
-            </p>
-          </CardContent>
-        </Card>
       </div>
     </TooltipProvider>
   );
 };
+

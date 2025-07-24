@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SQLQueryInput } from "@/components/SQLQueryInput";
 import { LockAnalysisResults, LockAnalysis } from "@/components/LockAnalysisResults";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { parseSQL, getLockAnalysis } from "@/lib/sqlParser";
+import { parseSQL, getLockAnalysis, getTableLockAnalysis } from "@/lib/sqlParser";
 import { Database, Lock, Zap } from "lucide-react";
 
 const Index = () => {
@@ -14,14 +14,16 @@ const Index = () => {
   const [queryType, setQueryType] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const analyzeQuery = () => {
+  const analyzeQuery = async () => {
     setIsAnalyzing(true);
     setError("");
     setResults([]);
     
-    // Small delay for better UX
-    setTimeout(() => {
-      const parsed = parseSQL(query);
+    try {
+      // Small delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const parsed = await parseSQL(query);
       
       if (!parsed.isValid) {
         setError(parsed.error || "Failed to parse SQL query");
@@ -35,24 +37,22 @@ const Index = () => {
         return;
       }
 
-      const lockInfo = getLockAnalysis(parsed.command);
-      if (!lockInfo) {
+      // Use the new getTableLockAnalysis function for individual table lock modes
+      const analysisResults: LockAnalysis[] = getTableLockAnalysis(parsed.tables, parsed.command);
+      
+      if (analysisResults.length === 0) {
         setError(`Lock analysis not available for command: ${parsed.command}`);
         setIsAnalyzing(false);
         return;
       }
 
-      const analysisResults: LockAnalysis[] = parsed.tables.map(table => ({
-        table,
-        lockMode: lockInfo.lockMode,
-        description: lockInfo.description,
-        conflicts: lockInfo.conflicts
-      }));
-
       setResults(analysisResults);
       setQueryType(parsed.command);
       setIsAnalyzing(false);
-    }, 500);
+    } catch (error) {
+      setError(`Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsAnalyzing(false);
+    }
   };
 
   const handleExampleQuery = (exampleQuery: string) => {
@@ -65,16 +65,12 @@ const Index = () => {
       query: "SELECT * FROM users;"
     },
     {
-      label: "SELECT FOR UPDATE", 
-      query: "SELECT * FROM users FOR UPDATE;"
-    },
-    {
       label: "UPDATE Query", 
       query: "UPDATE employees SET salary = salary * 1.10 WHERE department = 'Sales';"
     },
     {
-      label: "CREATE INDEX",
-      query: "CREATE INDEX CONCURRENTLY idx_employee_salary ON employees(salary);"
+      label: "SELECT with JOIN", 
+      query: "SELECT u.name, p.title FROM users u JOIN posts p ON u.id = p.user_id;"
     }
   ];
 

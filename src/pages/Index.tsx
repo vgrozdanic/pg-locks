@@ -62,7 +62,11 @@ const Index = () => {
   const exampleQueries = [
     {
       label: "SELECT Query",
-      query: "SELECT * FROM employees JOIN departments ON employees.dept_id = departments.id WHERE salary > 50000;"
+      query: "SELECT * FROM users;"
+    },
+    {
+      label: "SELECT FOR UPDATE", 
+      query: "SELECT * FROM users FOR UPDATE;"
     },
     {
       label: "UPDATE Query", 
@@ -146,10 +150,10 @@ const Index = () => {
                     className="w-full justify-start text-left h-auto p-3"
                     onClick={() => handleExampleQuery(example.query)}
                   >
-                    <div>
+                    <div className="w-full">
                       <div className="font-medium text-sm">{example.label}</div>
-                      <div className="text-xs text-muted-foreground mt-1 truncate">
-                        {example.query.substring(0, 50)}...
+                      <div className="text-xs text-muted-foreground mt-1 break-words whitespace-normal">
+                        {example.query.length > 60 ? example.query.substring(0, 60) + '...' : example.query}
                       </div>
                     </div>
                   </Button>
@@ -157,26 +161,6 @@ const Index = () => {
               </CardContent>
             </Card>
 
-            {/* Lock Types Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Common Lock Types</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <strong className="text-primary">ACCESS SHARE:</strong> SELECT queries
-                </div>
-                <div>
-                  <strong className="text-primary">ROW EXCLUSIVE:</strong> INSERT, UPDATE, DELETE
-                </div>
-                <div>
-                  <strong className="text-accent">SHARE:</strong> CREATE INDEX
-                </div>
-                <div>
-                  <strong className="text-destructive">ACCESS EXCLUSIVE:</strong> DROP, TRUNCATE, most ALTER TABLE
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>

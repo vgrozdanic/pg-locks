@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileQuestion, Database, AlertTriangle } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 // Simple tooltip component that definitely works
 const SimpleTooltip = ({
@@ -138,12 +139,14 @@ export const LockAnalysisResults = ({
                   <code className="font-mono text-primary">{result.table}</code>
                 </CardTitle>
                 <SimpleTooltip content={result.description}>
-                  <Badge
-                    variant={getLockBadgeVariant(result.lockMode)}
-                    className="font-mono text-xs cursor-help"
-                  >
-                    {result.lockMode}
-                  </Badge>
+                  <Link to={`/lock/${encodeURIComponent(result.lockMode)}`}>
+                    <Badge
+                      variant={getLockBadgeVariant(result.lockMode)}
+                      className="font-mono text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      {result.lockMode}
+                    </Badge>
+                  </Link>
                 </SimpleTooltip>
               </div>
             </CardHeader>
@@ -167,12 +170,14 @@ export const LockAnalysisResults = ({
                         key={i}
                         content={getLockDescription(conflict)}
                       >
-                        <Badge
-                          variant="outline"
-                          className="text-xs cursor-help"
-                        >
-                          {conflict}
-                        </Badge>
+                        <Link to={`/lock/${encodeURIComponent(conflict)}`}>
+                          <Badge
+                            variant="outline"
+                            className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
+                          >
+                            {conflict}
+                          </Badge>
+                        </Link>
                       </SimpleTooltip>
                     ))}
                   </div>

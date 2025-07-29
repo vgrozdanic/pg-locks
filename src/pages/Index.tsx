@@ -95,11 +95,8 @@ const Index = () => {
       setQueryType(parsed.command);
       setIsAnalyzing(false);
     } catch (error) {
-      setError(
-        `Analysis failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setError(`Analysis failed: ${errorMessage}`);
       setIsAnalyzing(false);
     }
   };

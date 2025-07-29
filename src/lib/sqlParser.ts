@@ -26,7 +26,8 @@ async function initParser(): Promise<PgParser> {
 
       // Check if the result indicates an error
       if (testResult && typeof testResult === 'object' && 'error' in testResult && testResult.error) {
-        throw new Error(`Parser test failed: ${testResult.error}`);
+        const errorMessage = typeof testResult.error === 'string' ? testResult.error : String(testResult.error);
+        throw new Error(`Parser test failed: ${errorMessage}`);
       }
 
       // Check if we got a valid tree result
@@ -65,7 +66,8 @@ export async function parseSQL(query: string): Promise<ParsedQuery> {
 
     // Check if parsing failed
     if (result && typeof result === 'object' && 'error' in result && result.error) {
-      return { command: '', tables: [], isValid: false, error: result.error };
+      const errorMessage = typeof result.error === 'string' ? result.error : String(result.error);
+      return { command: '', tables: [], isValid: false, error: errorMessage };
     }
 
     // Extract the AST tree

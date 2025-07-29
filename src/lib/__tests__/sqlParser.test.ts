@@ -623,6 +623,42 @@ ON CONFLICT (page_url) DO UPDATE SET visit_count = site_visits.visit_count + 1;`
       expect(result.isValid).toBe(false);
       expect(result.error).toBe('Query cannot be empty');
     });
+
+    it('should handle malformed SELECT with missing table name', async () => {
+      const query = 'SELECT * FROM;';
+      const result = await parseSQL(query);
+      
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(typeof result.error).toBe('string');
+    });
+
+    it('should handle incomplete WHERE clause', async () => {
+      const query = 'SELECT * FROM users WHERE';
+      const result = await parseSQL(query);
+      
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(typeof result.error).toBe('string');
+    });
+
+    it('should handle malformed UPDATE statement', async () => {
+      const query = 'UPDATE users SET WHERE id = 1;';
+      const result = await parseSQL(query);
+      
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(typeof result.error).toBe('string');
+    });
+
+    it('should handle query with unmatched parentheses', async () => {
+      const query = 'SELECT * FROM users WHERE id IN (1, 2, 3;';
+      const result = await parseSQL(query);
+      
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(typeof result.error).toBe('string');
+    });
   });
 
   describe('Table Lock Mode Analysis', () => {

@@ -1,3 +1,5 @@
+import { LockInfo, COMMAND_LOCKS, getLockAnalysis as getLockAnalysisFromData, LOCK_MODES } from './lockData';
+
 export interface ParsedQuery {
   command: string;
   tables: string[];
@@ -5,85 +7,6 @@ export interface ParsedQuery {
   error?: string;
 }
 
-export interface LockInfo {
-  lockMode: string;
-  description: string;
-  conflicts: string[];
-}
-
-const LOCK_MODES: Record<string, LockInfo> = {
-  'ACCESS SHARE': {
-    lockMode: 'ACCESS SHARE',
-    description: 'Conflicts with ACCESS EXCLUSIVE lock mode only. Can be held by multiple transactions simultaneously. Acquired by SELECT and other read-only operations. Held until end of transaction. This is the least restrictive table-level lock.',
-    conflicts: ['ACCESS EXCLUSIVE']
-  },
-  'ROW SHARE': {
-    lockMode: 'ROW SHARE',
-    description: 'Conflicts with EXCLUSIVE and ACCESS EXCLUSIVE lock modes. Acquired by SELECT with FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE, or FOR KEY SHARE options. Also acquires row-level locks on selected rows, preventing them from being modified or deleted by other transactions until the current transaction ends. Held until end of transaction.',
-    conflicts: ['EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  },
-  'ROW EXCLUSIVE': {
-    lockMode: 'ROW EXCLUSIVE',
-    description: 'Conflicts with SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Acquired by UPDATE, DELETE, INSERT, and MERGE commands on the target table (other referenced tables get ACCESS SHARE locks). Held until end of transaction.',
-    conflicts: ['SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  },
-  'SHARE UPDATE EXCLUSIVE': {
-    lockMode: 'SHARE UPDATE EXCLUSIVE',
-    description: 'Conflicts with SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Self-conflicting - only one transaction can hold this lock at a time. Protects against concurrent schema changes and VACUUM runs. Acquired by VACUUM (without FULL), ANALYZE, CREATE INDEX CONCURRENTLY, CREATE STATISTICS, COMMENT ON, REINDEX CONCURRENTLY, and certain ALTER INDEX and ALTER TABLE variants. Held until end of transaction.',
-    conflicts: ['SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  },
-  'SHARE': {
-    lockMode: 'SHARE',
-    description: 'Conflicts with ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Protects a table against concurrent data changes - blocks all data modifications while allowing concurrent reads. Acquired by CREATE INDEX (without CONCURRENTLY). Held until end of transaction.',
-    conflicts: ['ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  },
-  'SHARE ROW EXCLUSIVE': {
-    lockMode: 'SHARE ROW EXCLUSIVE',
-    description: 'Conflicts with ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Self-exclusive - only one session can hold this lock at a time. Protects against concurrent data changes. Acquired by CREATE TRIGGER and some forms of ALTER TABLE. Held until end of transaction.',
-    conflicts: ['ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  },
-  'EXCLUSIVE': {
-    lockMode: 'EXCLUSIVE',
-    description: 'Conflicts with ROW SHARE, ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. Allows only concurrent ACCESS SHARE locks - only reads from the table can proceed in parallel. Acquired by REFRESH MATERIALIZED VIEW CONCURRENTLY. Held until end of transaction.',
-    conflicts: ['ROW SHARE', 'ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  },
-  'ACCESS EXCLUSIVE': {
-    lockMode: 'ACCESS EXCLUSIVE',
-    description: 'Conflicts with locks of all modes - most restrictive lock. Guarantees that the holder is the only transaction accessing the table in any way. Only ACCESS EXCLUSIVE blocks simple SELECT statements. Acquired by DROP TABLE, TRUNCATE, REINDEX, CLUSTER, VACUUM FULL, REFRESH MATERIALIZED VIEW (without CONCURRENTLY), many forms of ALTER INDEX and ALTER TABLE. Default for LOCK TABLE statements. Held until end of transaction.',
-    conflicts: ['ACCESS SHARE', 'ROW SHARE', 'ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE']
-  }
-};
-
-const COMMAND_LOCKS: Record<string, string> = {
-  'SELECT': 'ACCESS SHARE',
-  'SELECT FOR UPDATE': 'ROW SHARE',
-  'SELECT FOR NO KEY UPDATE': 'ROW SHARE',
-  'SELECT FOR SHARE': 'ROW SHARE',
-  'SELECT FOR KEY SHARE': 'ROW SHARE',
-  'INSERT': 'ROW EXCLUSIVE',
-  'INSERT ON CONFLICT': 'ROW EXCLUSIVE',
-  'UPDATE': 'ROW EXCLUSIVE',
-  'DELETE': 'ROW EXCLUSIVE',
-  'MERGE': 'ROW EXCLUSIVE',
-  'TRUNCATE': 'ACCESS EXCLUSIVE',
-  'DROP TABLE': 'ACCESS EXCLUSIVE',
-  'CREATE INDEX': 'SHARE',
-  'CREATE INDEX CONCURRENTLY': 'SHARE UPDATE EXCLUSIVE',
-  'REINDEX': 'ACCESS EXCLUSIVE',
-  'VACUUM': 'SHARE UPDATE EXCLUSIVE',
-  'VACUUM FULL': 'ACCESS EXCLUSIVE',
-  'ANALYZE': 'SHARE UPDATE EXCLUSIVE',
-  'ALTER TABLE': 'ACCESS EXCLUSIVE',
-  'ALTER TABLE ADD COLUMN': 'SHARE UPDATE EXCLUSIVE',
-  'ALTER TABLE ADD FOREIGN KEY': 'SHARE ROW EXCLUSIVE',
-  'ALTER TABLE VALIDATE CONSTRAINT': 'SHARE UPDATE EXCLUSIVE',
-  'ALTER TABLE ATTACH PARTITION': 'SHARE UPDATE EXCLUSIVE',
-  'ALTER TABLE SET TABLESPACE': 'ACCESS EXCLUSIVE',
-  'ALTER TABLE DISABLE TRIGGER': 'SHARE ROW EXCLUSIVE',
-  'CREATE TRIGGER': 'SHARE ROW EXCLUSIVE',
-  'REFRESH MATERIALIZED VIEW': 'ACCESS EXCLUSIVE',
-  'REFRESH MATERIALIZED VIEW CONCURRENTLY': 'EXCLUSIVE'
-};
 
 // Import @supabase/pg-parser for browser-compatible AST parsing
 import { PgParser } from '@supabase/pg-parser';
@@ -643,12 +566,7 @@ function extractTablesFromSubquery(subquery: any, tables: Set<string>, cteNames:
 }
 
 export function getLockAnalysis(command: string): LockInfo | null {
-  const lockMode = COMMAND_LOCKS[command];
-  if (!lockMode) {
-    return null;
-  }
-
-  return LOCK_MODES[lockMode];
+  return getLockAnalysisFromData(command);
 }
 
 export interface TableLockInfo {
@@ -686,13 +604,13 @@ export function getTableLockAnalysis(tables: string[], command: string, primaryT
       lockMode = 'ACCESS SHARE';
     }
 
-    const lockInfo = LOCK_MODES[lockMode];
-    if (lockInfo) {
+    const lockModeInfo = LOCK_MODES[lockMode];
+    if (lockModeInfo) {
       results.push({
         table,
         lockMode,
-        description: lockInfo.description,
-        conflicts: lockInfo.conflicts
+        description: lockModeInfo.description,
+        conflicts: lockModeInfo.conflicts
       });
     }
   }

@@ -13,9 +13,11 @@ export const LOCK_MODES: Record<string, LockMode> = {
     conflicts: ['ACCESS EXCLUSIVE'],
     statements: [
       'SELECT (read-only queries)',
-      'SELECT with no locking clauses'
+      'SELECT with no locking clauses',
+      'COPY TO',
+      'EXPLAIN'
     ],
-    details: 'This is the most permissive lock mode. It allows concurrent reads and most other operations. Only blocked by ACCESS EXCLUSIVE locks. This lock is automatically acquired by SELECT statements that only read data without any FOR UPDATE/SHARE clauses.'
+    details: 'This is the most permissive lock mode. It allows all concurrent operations except ACCESS EXCLUSIVE. Only blocked by ACCESS EXCLUSIVE locks. This lock is acquired by read-only operations that do not modify data or require row-level locks.'
   },
   'ROW SHARE': {
     name: 'ROW SHARE',
@@ -37,9 +39,11 @@ export const LOCK_MODES: Record<string, LockMode> = {
       'UPDATE',
       'DELETE', 
       'INSERT',
-      'MERGE'
+      'INSERT ON CONFLICT',
+      'MERGE',
+      'COPY FROM'
     ],
-    details: 'This lock mode is acquired by commands that modify data. It allows concurrent reads and other row-exclusive operations, but prevents operations that require stronger locks like index creation.'
+    details: 'This lock mode is acquired by commands that modify data. It allows concurrent reads and other row-exclusive operations, but conflicts with SHARE locks (preventing operations like index creation).'
   },
   'SHARE UPDATE EXCLUSIVE': {
     name: 'SHARE UPDATE EXCLUSIVE',
@@ -53,7 +57,7 @@ export const LOCK_MODES: Record<string, LockMode> = {
       'COMMENT ON',
       'REINDEX CONCURRENTLY'
     ],
-    details: 'This lock mode protects against concurrent schema changes and allows only one VACUUM-type operation at a time. It permits ordinary reads and writes but prevents other maintenance operations.'
+    details: 'This lock mode protects against concurrent schema changes and allows only one such operation at a time. It permits ordinary reads and writes but prevents concurrent VACUUM-type operations and schema modifications.'
   },
   'SHARE': {
     name: 'SHARE',
@@ -70,9 +74,10 @@ export const LOCK_MODES: Record<string, LockMode> = {
     conflicts: ['ROW EXCLUSIVE', 'SHARE UPDATE EXCLUSIVE', 'SHARE', 'SHARE ROW EXCLUSIVE', 'EXCLUSIVE', 'ACCESS EXCLUSIVE'],
     statements: [
       'CREATE TRIGGER',
-      'ALTER TABLE (some forms)'
+      'ALTER TABLE ADD FOREIGN KEY',
+      'ALTER TABLE DISABLE TRIGGER'
     ],
-    details: 'This lock mode is more restrictive than SHARE, preventing concurrent SHARE ROW EXCLUSIVE locks. It allows reads but blocks most other operations.'
+    details: 'This lock mode is more restrictive than SHARE because it conflicts with SHARE locks and itself. It allows reads but prevents data modifications and any concurrent schema-changing operations.'
   },
   'EXCLUSIVE': {
     name: 'EXCLUSIVE',
@@ -95,7 +100,8 @@ export const LOCK_MODES: Record<string, LockMode> = {
       'VACUUM FULL',
       'LOCK TABLE (default mode)',
       'ALTER TABLE (most forms)',
-      'CREATE INDEX (some cases)'
+      'ALTER TABLE SET TABLESPACE',
+      'REFRESH MATERIALIZED VIEW'
     ],
     details: 'This is the most restrictive lock mode. It conflicts with all other lock modes, effectively making the table inaccessible to any other transaction until the lock is released. This ensures exclusive access to the table.'
   }
@@ -107,4 +113,68 @@ export function getLockModeInfo(lockName: string): LockMode | undefined {
 
 export function getAllLockModes(): LockMode[] {
   return Object.values(LOCK_MODES);
+}
+
+// Mapping of SQL commands to their lock modes
+export const COMMAND_LOCKS: Record<string, string> = {
+  'SELECT': 'ACCESS SHARE',
+  'SELECT FOR UPDATE': 'ROW SHARE',
+  'SELECT FOR NO KEY UPDATE': 'ROW SHARE',
+  'SELECT FOR SHARE': 'ROW SHARE',
+  'SELECT FOR KEY SHARE': 'ROW SHARE',
+  'INSERT': 'ROW EXCLUSIVE',
+  'INSERT ON CONFLICT': 'ROW EXCLUSIVE',
+  'UPDATE': 'ROW EXCLUSIVE',
+  'DELETE': 'ROW EXCLUSIVE',
+  'MERGE': 'ROW EXCLUSIVE',
+  'COPY TO': 'ACCESS SHARE',
+  'COPY FROM': 'ROW EXCLUSIVE',
+  'EXPLAIN': 'ACCESS SHARE',
+  'TRUNCATE': 'ACCESS EXCLUSIVE',
+  'DROP TABLE': 'ACCESS EXCLUSIVE',
+  'CREATE INDEX': 'SHARE',
+  'CREATE INDEX CONCURRENTLY': 'SHARE UPDATE EXCLUSIVE',
+  'REINDEX': 'ACCESS EXCLUSIVE',
+  'VACUUM': 'SHARE UPDATE EXCLUSIVE',
+  'VACUUM FULL': 'ACCESS EXCLUSIVE',
+  'ANALYZE': 'SHARE UPDATE EXCLUSIVE',
+  'ALTER TABLE': 'ACCESS EXCLUSIVE',
+  'ALTER TABLE ADD COLUMN': 'SHARE UPDATE EXCLUSIVE',
+  'ALTER TABLE ADD FOREIGN KEY': 'SHARE ROW EXCLUSIVE',
+  'ALTER TABLE VALIDATE CONSTRAINT': 'SHARE UPDATE EXCLUSIVE',
+  'ALTER TABLE ATTACH PARTITION': 'SHARE UPDATE EXCLUSIVE',
+  'ALTER TABLE SET TABLESPACE': 'ACCESS EXCLUSIVE',
+  'ALTER TABLE DISABLE TRIGGER': 'SHARE ROW EXCLUSIVE',
+  'CREATE TRIGGER': 'SHARE ROW EXCLUSIVE',
+  'REFRESH MATERIALIZED VIEW': 'ACCESS EXCLUSIVE',
+  'REFRESH MATERIALIZED VIEW CONCURRENTLY': 'EXCLUSIVE'
+};
+
+export function getCommandLockMode(command: string): string | null {
+  return COMMAND_LOCKS[command] || null;
+}
+
+// Interface for backward compatibility with sqlParser.ts
+export interface LockInfo {
+  lockMode: string;
+  description: string;
+  conflicts: string[];
+}
+
+export function getLockAnalysis(command: string): LockInfo | null {
+  const lockMode = COMMAND_LOCKS[command];
+  if (!lockMode) {
+    return null;
+  }
+
+  const lockModeInfo = LOCK_MODES[lockMode];
+  if (!lockModeInfo) {
+    return null;
+  }
+
+  return {
+    lockMode: lockModeInfo.name,
+    description: lockModeInfo.description,
+    conflicts: lockModeInfo.conflicts
+  };
 }

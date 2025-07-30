@@ -15,8 +15,8 @@ import {
   QueryComparisonResult,
   QueryAnalysisInput,
 } from "@/lib/queryComparison";
-import { GitCompare, ArrowLeft, Users, Shield, AlertTriangle } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { GitCompare, Users, Shield, AlertTriangle } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 const QueryComparison = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -192,13 +192,6 @@ const QueryComparison = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center items-center gap-3 mb-4">
-            <Link
-              to="/"
-              className="absolute left-4 top-8 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Single Analysis
-            </Link>
             <img
               src="/android-chrome-512x512.png"
               alt="PostgreSQL Lock Analyzer Logo"

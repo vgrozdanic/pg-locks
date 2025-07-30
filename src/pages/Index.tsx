@@ -13,7 +13,8 @@ import {
   getTableLockAnalysis,
 } from "@/lib/sqlParser";
 import { getQueryFromUrl, updateUrlWithQuery } from "@/lib/urlUtils";
-import { Lock, Zap } from "lucide-react";
+import { Lock, Zap, GitCompare } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const [query, setQuery] = useState("");
@@ -146,6 +147,14 @@ const Index = () => {
             table will be acquired. Enter an SQL query below and get detailed
             lock analysis.
           </p>
+          <div className="mt-6">
+            <Link to="/compare">
+              <Button variant="outline" className="bg-background/50 hover:bg-accent hover:text-accent-foreground">
+                <GitCompare className="h-4 w-4 mr-2" />
+                Compare Two Queries
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Main Content */}
